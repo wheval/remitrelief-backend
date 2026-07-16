@@ -1,33 +1,34 @@
 import { Router } from "express";
+import { listCampaigns, getCampaign } from "../services/campaignsRepo.js";
 import { getEscrowBalance } from "../services/soroban.js";
 
 const router = Router();
 
-// TODO: replace with real DB; seeded demo data for now
-const campaigns = [
-  {
-    id: "flood-relief-oaxaca",
-    name: "Oaxaca Flood Relief",
-    location: "Oaxaca, Mexico",
-    goal: 20000,
-    raised: 6420,
-    milestonesTotal: 4,
-    milestonesVerified: 1,
-    escrowAddress: "CONTRACT_ID_PLACEHOLDER",
-    usdcIssuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
-  },
-];
-
-router.get("/", async (_req, res) => {
-  res.json(campaigns);
+router.get("/", async (_req, res, next) => {
+  try {
+    res.json(listCampaigns());
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get("/:id", async (req, res) => {
-  const campaign = campaigns.find((c) => c.id === req.params.id);
-  if (!campaign) return res.status(404).json({ error: "not found" });
+router.get("/:id", async (req, res, next) => {
+  try {
+    const campaign = getCampaign(req.params.id);
+    if (!campaign) return res.status(404).json({ error: "not found" });
 
-  const onChainBalance = await getEscrowBalance(campaign.escrowAddress);
-  res.json({ ...campaign, onChainBalance });
+    let onChainBalance = null;
+    if (campaign.escrow_contract_id) {
+      onChainBalance = await getEscrowBalance(
+        campaign.escrow_contract_id,
+        campaign.recipient_address
+      );
+    }
+
+    res.json({ ...campaign, onChainBalance });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
